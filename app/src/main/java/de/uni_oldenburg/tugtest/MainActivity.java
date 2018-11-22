@@ -101,8 +101,8 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
         } else if (event.sensor.getType() == Sensor.TYPE_GRAVITY) {
             main.setText(Arrays.toString(event.values));
             Measurement measurement = new Measurement(MeasurementType.GRAVITY, event.values);
-            this.mGravityReading = event.values;
-            RabbitMQManager.getInstance().queueMeasurement(measurement);
+            System.arraycopy(event.values, 0, mGravityReading,
+                    0, mGravityReading.length);            RabbitMQManager.getInstance().queueMeasurement(measurement);
         } else if (event.sensor.getType() == Sensor.TYPE_LINEAR_ACCELERATION) {
             main.setText(Arrays.toString(event.values));
             Measurement measurement = new Measurement(MeasurementType.ACCELERATION, event.values);
