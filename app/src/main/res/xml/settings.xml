@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<PreferenceScreen xmlns:android="http://schemas.android.com/apk/res/android">
+    <PreferenceCategory
+        android:title="Connection"
+        android:key="pref_key_storage_settings">
+        <EditTextPreference
+            android:title="RabbitMQ host"
+            android:summary="Host for RabbitMQ Connection"
+            android:key="rmq_host">
+        </EditTextPreference>
+    </PreferenceCategory>
+</PreferenceScreen>

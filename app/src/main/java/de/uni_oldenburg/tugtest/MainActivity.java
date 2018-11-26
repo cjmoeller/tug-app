@@ -1,17 +1,23 @@
 package de.uni_oldenburg.tugtest;
 
 import androidx.appcompat.app.AppCompatActivity;
+import androidx.preference.PreferenceManager;
 import de.uni_oldenburg.tugtest.model.Measurement;
 import de.uni_oldenburg.tugtest.model.MeasurementType;
 import de.uni_oldenburg.tugtest.model.RabbitMQManager;
 
 import android.content.Context;
+import android.content.Intent;
+import android.content.SharedPreferences;
 import android.hardware.Sensor;
 import android.hardware.SensorEvent;
 import android.hardware.SensorEventListener;
 import android.hardware.SensorManager;
 import android.os.Bundle;
 import android.util.Log;
+import android.view.Menu;
+import android.view.MenuInflater;
+import android.view.MenuItem;
 import android.widget.TextView;
 
 import com.rabbitmq.client.Channel;
@@ -63,10 +69,12 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
 
 
     public void connect() {
+        SharedPreferences prefs = PreferenceManager.getDefaultSharedPreferences(this);
+        String host = prefs.getString("rmq_host", "127.0.0.1");
         ConnectionFactory factory = new ConnectionFactory();
         factory.setUsername(Constants.RABBIT_MQ_USER);
-        factory.setPassword(Constants.RABBIT_MQ_USER);
-        factory.setHost(Constants.RABBIT_MQ_HOST);
+        factory.setPassword(Constants.RABBIT_MQ_PASSWORD);
+        factory.setHost(host);
         factory.setPort(5672);
         try {
 
@@ -126,6 +134,26 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
             android.opengl.Matrix.multiplyMV(earthAcc, 0, inv, 0, deviceRelativeAcc, 0);
             float[] result = {earthAcc[0], earthAcc[1], earthAcc[2] - 9.81f}; //correct gravity
             RabbitMQManager.getInstance().queueMeasurement(new Measurement(MeasurementType.EARTH_FRAME_ALIGNED_ACC, result));
+        }
+    }
+
+    @Override
+    public boolean onCreateOptionsMenu(Menu menu) {
+        MenuInflater inflater = getMenuInflater();
+        inflater.inflate(R.menu.menu_main, menu);
+        return true;
+    }
+
+    @Override
+    public boolean onOptionsItemSelected(MenuItem item) {
+        // Handle item selection
+        switch (item.getItemId()) {
+            case R.id.action_settings:
+                Intent settings = new Intent(this, SettingsActivity.class);
+                startActivity(settings);
+                return true;
+            default:
+                return super.onOptionsItemSelected(item);
         }
     }
 
