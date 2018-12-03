@@ -34,6 +34,8 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
     private final float[] mAccelerometerReading = new float[3];
     private final float[] mMagnetometerReading = new float[3];
     private float[] mGravityReading = new float[3];
+    private float[] mGyroReading = new float[3];
+    private float[] lastGyro = new float[3];
 
 
     @Override
@@ -54,15 +56,15 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
 
 
         //Sensor listeners
-        mSensorManager.registerListener(this, accSensor, SensorManager.SENSOR_DELAY_FASTEST);
+        mSensorManager.registerListener(this, accSensor, SensorManager.SENSOR_DELAY_NORMAL);
 
-        mSensorManager.registerListener(this, gravitySensor, SensorManager.SENSOR_DELAY_FASTEST);
+        mSensorManager.registerListener(this, gravitySensor, SensorManager.SENSOR_DELAY_NORMAL);
 
-        mSensorManager.registerListener(this, gyroSensor, SensorManager.SENSOR_DELAY_FASTEST);
+        mSensorManager.registerListener(this, gyroSensor, SensorManager.SENSOR_DELAY_NORMAL);
 
-        mSensorManager.registerListener(this, magneticFieldSensor, SensorManager.SENSOR_DELAY_FASTEST);
+        mSensorManager.registerListener(this, magneticFieldSensor, SensorManager.SENSOR_DELAY_NORMAL);
 
-        mSensorManager.registerListener(this, linearAcc, SensorManager.SENSOR_DELAY_FASTEST);
+        mSensorManager.registerListener(this, linearAcc, SensorManager.SENSOR_DELAY_NORMAL);
     }
 
     private Channel channel;
@@ -100,6 +102,7 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
         RabbitMQManager.getInstance().stopStream();
     }
 
+    private float[] lastAcc = new float[3];
 
     @Override
     public void onSensorChanged(SensorEvent event) {
@@ -108,23 +111,20 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
                     0, mAccelerometerReading.length);
         } else if (event.sensor.getType() == Sensor.TYPE_GRAVITY) {
             main.setText(Arrays.toString(event.values));
-            Measurement measurement = new Measurement(MeasurementType.GRAVITY, event.values);
             System.arraycopy(event.values, 0, mGravityReading,
-                    0, mGravityReading.length);            RabbitMQManager.getInstance().queueMeasurement(measurement);
+                    0, mGravityReading.length);
         } else if (event.sensor.getType() == Sensor.TYPE_LINEAR_ACCELERATION) {
             main.setText(Arrays.toString(event.values));
-            Measurement measurement = new Measurement(MeasurementType.ACCELERATION, event.values);
-            RabbitMQManager.getInstance().queueMeasurement(measurement);
         } else if (event.sensor.getType() == Sensor.TYPE_GYROSCOPE) {
             main.setText(Arrays.toString(event.values));
-            Measurement measurement = new Measurement(MeasurementType.ROTATION, event.values);
-            RabbitMQManager.getInstance().queueMeasurement(measurement);
+            System.arraycopy(event.values, 0, mGyroReading,
+                    0, mGyroReading.length);
         } else if (event.sensor.getType() == Sensor.TYPE_MAGNETIC_FIELD) {
             System.arraycopy(event.values, 0, mMagnetometerReading,
                     0, mMagnetometerReading.length);
         }
         if (this.mAccelerometerReading != null && this.mMagnetometerReading != null) {
-            float[] R = new float[16], I = new float[16], earthAcc = new float[16];
+            float[] R = new float[16], I = new float[16], earthAcc = new float[16], earthRot = new float[16];
             SensorManager.getRotationMatrix(R, I,
                     mGravityReading, mMagnetometerReading);
             float[] inv = new float[16];
@@ -132,8 +132,22 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
 
             android.opengl.Matrix.invertM(inv, 0, R, 0);
             android.opengl.Matrix.multiplyMV(earthAcc, 0, inv, 0, deviceRelativeAcc, 0);
-            float[] result = {earthAcc[0], earthAcc[1], earthAcc[2] - 9.81f}; //correct gravity
-            RabbitMQManager.getInstance().queueMeasurement(new Measurement(MeasurementType.EARTH_FRAME_ALIGNED_ACC, result));
+            float[] resultAcc = {earthAcc[0], earthAcc[1], earthAcc[2] - 9.81f}; //correct gravity
+
+            float[] deviceGyro = {mGyroReading[0], mGyroReading[1], mGyroReading[2], 0};
+            android.opengl.Matrix.multiplyMV(earthRot, 0, inv, 0, deviceGyro, 0);
+            float[] resultGyro = {earthRot[0], earthRot[1], earthRot[2]};
+
+            if(!Arrays.equals(this.lastAcc, resultAcc)){
+            RabbitMQManager.getInstance().queueMeasurement(new Measurement(MeasurementType.EARTH_FRAME_ALIGNED_ACC, resultAcc));
+                this.lastAcc = resultAcc;
+
+            }
+            if(!Arrays.equals(this.lastGyro, resultGyro)){
+                RabbitMQManager.getInstance().queueMeasurement(new Measurement(MeasurementType.EARTH_FRAME_ALIGNED_GYRO, resultAcc));
+                this.lastGyro = resultGyro;
+
+            }
         }
     }
 
