@@ -56,15 +56,15 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
 
 
         //Sensor listeners
-        mSensorManager.registerListener(this, accSensor, SensorManager.SENSOR_DELAY_NORMAL);
+        mSensorManager.registerListener(this, accSensor, SensorManager.SENSOR_DELAY_UI);
 
-        mSensorManager.registerListener(this, gravitySensor, SensorManager.SENSOR_DELAY_NORMAL);
+        mSensorManager.registerListener(this, gravitySensor, SensorManager.SENSOR_DELAY_UI);
 
-        mSensorManager.registerListener(this, gyroSensor, SensorManager.SENSOR_DELAY_NORMAL);
+        mSensorManager.registerListener(this, gyroSensor, SensorManager.SENSOR_DELAY_UI);
 
-        mSensorManager.registerListener(this, magneticFieldSensor, SensorManager.SENSOR_DELAY_NORMAL);
+        mSensorManager.registerListener(this, magneticFieldSensor, SensorManager.SENSOR_DELAY_UI);
 
-        mSensorManager.registerListener(this, linearAcc, SensorManager.SENSOR_DELAY_NORMAL);
+        mSensorManager.registerListener(this, linearAcc, SensorManager.SENSOR_DELAY_UI);
     }
 
     private Channel channel;
@@ -83,13 +83,14 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
             Connection conn = factory.newConnection();
             channel = conn.createChannel();
             channel.exchangeDeclare(Constants.RABBIT_MQ_EXCHANGE, "direct", true);
-            channel.queueDeclare(Constants.RABBIT_MQ_QUEUE_NAME, true, false, true, null);
+            channel.queueDeclare(Constants.RABBIT_MQ_QUEUE_NAME, true, false, false, null);
             channel.queueBind(Constants.RABBIT_MQ_QUEUE_NAME, Constants.RABBIT_MQ_EXCHANGE, Constants.RABBIT_MQ_ROUTING_KEY);
             RabbitMQManager.getInstance().setRmqChannel(channel);
             RabbitMQManager.getInstance().startStream();
 
         } catch (IOException e) {
-            Log.e("Log", e.getLocalizedMessage());
+            e.printStackTrace();
+            //Log.e("Log", e.getLocalizedMessage());
         } catch (TimeoutException e) {
             Log.e("Log", e.getLocalizedMessage());
         }
@@ -144,7 +145,7 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
 
             }
             if(!Arrays.equals(this.lastGyro, resultGyro)){
-                RabbitMQManager.getInstance().queueMeasurement(new Measurement(MeasurementType.EARTH_FRAME_ALIGNED_GYRO, resultAcc));
+                RabbitMQManager.getInstance().queueMeasurement(new Measurement(MeasurementType.EARTH_FRAME_ALIGNED_GYRO, resultGyro));
                 this.lastGyro = resultGyro;
 
             }
