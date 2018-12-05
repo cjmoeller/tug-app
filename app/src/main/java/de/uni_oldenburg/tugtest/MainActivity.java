@@ -1,11 +1,5 @@
 package de.uni_oldenburg.tugtest;
 
-import androidx.appcompat.app.AppCompatActivity;
-import androidx.preference.PreferenceManager;
-import de.uni_oldenburg.tugtest.model.Measurement;
-import de.uni_oldenburg.tugtest.model.MeasurementType;
-import de.uni_oldenburg.tugtest.model.RabbitMQManager;
-
 import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
@@ -14,10 +8,13 @@ import android.hardware.SensorEvent;
 import android.hardware.SensorEventListener;
 import android.hardware.SensorManager;
 import android.os.Bundle;
+import android.os.CountDownTimer;
+import android.os.Vibrator;
 import android.util.Log;
 import android.view.Menu;
 import android.view.MenuInflater;
 import android.view.MenuItem;
+import android.widget.Button;
 import android.widget.TextView;
 
 import com.rabbitmq.client.Channel;
@@ -28,14 +25,24 @@ import java.io.IOException;
 import java.util.Arrays;
 import java.util.concurrent.TimeoutException;
 
+import androidx.appcompat.app.AppCompatActivity;
+import androidx.preference.PreferenceManager;
+import de.uni_oldenburg.tugtest.model.Measurement;
+import de.uni_oldenburg.tugtest.model.MeasurementType;
+import de.uni_oldenburg.tugtest.model.RabbitMQManager;
+
 public class MainActivity extends AppCompatActivity implements SensorEventListener {
     private SensorManager mSensorManager;
     private TextView main;
+    private TextView state;
+    private Button start;
+
     private final float[] mAccelerometerReading = new float[3];
     private final float[] mMagnetometerReading = new float[3];
     private float[] mGravityReading = new float[3];
     private float[] mGyroReading = new float[3];
     private float[] lastGyro = new float[3];
+    private float stepCount = 0;
 
 
     @Override
@@ -49,8 +56,30 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
         Sensor linearAcc = mSensorManager.getDefaultSensor(Sensor.TYPE_LINEAR_ACCELERATION);
         Sensor gyroSensor = mSensorManager.getDefaultSensor(Sensor.TYPE_GYROSCOPE);
         Sensor magneticFieldSensor = mSensorManager.getDefaultSensor(Sensor.TYPE_MAGNETIC_FIELD);
+        Sensor stepCounter = mSensorManager.getDefaultSensor(Sensor.TYPE_STEP_COUNTER);
 
         main = findViewById(R.id.textView);
+        state = findViewById(R.id.textView2);
+        start = findViewById(R.id.button);
+
+        start.setOnClickListener(v -> new CountDownTimer(10000, 1000) {
+
+            public void onTick(long millisUntilFinished) {
+                state.setText(String.valueOf(millisUntilFinished / 1000));
+            }
+
+            public void onFinish() {
+                state.setText("test running");
+                float[] m = {0, 0, 0};
+                Measurement start = new Measurement(MeasurementType.MISC_START_MEASUREMENT, m);
+                RabbitMQManager.getInstance().queueMeasurement(start);
+                // Get instance of Vibrator from current Context
+                Vibrator v = (Vibrator) getSystemService(Context.VIBRATOR_SERVICE);
+
+                // Vibrate for 400 milliseconds
+                v.vibrate(1000);
+            }
+        }.start());
 
         new Thread(() -> this.connect()).start();
 
@@ -65,6 +94,8 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
         mSensorManager.registerListener(this, magneticFieldSensor, SensorManager.SENSOR_DELAY_UI);
 
         mSensorManager.registerListener(this, linearAcc, SensorManager.SENSOR_DELAY_UI);
+
+        mSensorManager.registerListener(this, stepCounter, SensorManager.SENSOR_DELAY_UI);
     }
 
     private Channel channel;
@@ -123,6 +154,13 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
         } else if (event.sensor.getType() == Sensor.TYPE_MAGNETIC_FIELD) {
             System.arraycopy(event.values, 0, mMagnetometerReading,
                     0, mMagnetometerReading.length);
+        } else if (event.sensor.getType() == Sensor.TYPE_STEP_COUNTER) {
+            if (stepCount == 0)
+                stepCount = event.values[0];
+            float tugSteps = event.values[0] - stepCount;
+            float[] measSteps = {tugSteps, 0, 0};
+            Measurement measurement = new Measurement(MeasurementType.STEPS, measSteps);
+            RabbitMQManager.getInstance().queueMeasurement(measurement);
         }
         if (this.mAccelerometerReading != null && this.mMagnetometerReading != null) {
             float[] R = new float[16], I = new float[16], earthAcc = new float[16], earthRot = new float[16];
@@ -139,12 +177,12 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
             android.opengl.Matrix.multiplyMV(earthRot, 0, inv, 0, deviceGyro, 0);
             float[] resultGyro = {earthRot[0], earthRot[1], earthRot[2]};
 
-            if(!Arrays.equals(this.lastAcc, resultAcc)){
-            RabbitMQManager.getInstance().queueMeasurement(new Measurement(MeasurementType.EARTH_FRAME_ALIGNED_ACC, resultAcc));
+            if (!Arrays.equals(this.lastAcc, resultAcc)) {
+                RabbitMQManager.getInstance().queueMeasurement(new Measurement(MeasurementType.EARTH_FRAME_ALIGNED_ACC, resultAcc));
                 this.lastAcc = resultAcc;
 
             }
-            if(!Arrays.equals(this.lastGyro, resultGyro)){
+            if (!Arrays.equals(this.lastGyro, resultGyro)) {
                 RabbitMQManager.getInstance().queueMeasurement(new Measurement(MeasurementType.EARTH_FRAME_ALIGNED_GYRO, resultGyro));
                 this.lastGyro = resultGyro;
 
