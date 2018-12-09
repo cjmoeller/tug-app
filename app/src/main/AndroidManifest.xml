@@ -30,6 +30,13 @@
                 android:name="android.support.PARENT_ACTIVITY"
                 android:value="de.uni_oldenburg.tugtest.MainActivity" />
         </activity>
+        <service android:name=".DataLayerListenerService">
+            <intent-filter>
+                <action android:name="com.google.android.gms.wearable.DATA_CHANGED" />
+                <data android:scheme="wear" android:host="*"
+                    android:path="/heartbeat" />
+            </intent-filter>
+        </service>
     </application>
 
 </manifest>

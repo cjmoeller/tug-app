@@ -34,4 +34,7 @@ dependencies {
     androidTestImplementation 'androidx.test.espresso:espresso-core:3.1.0'
 
     implementation 'com.rabbitmq:amqp-client:5.5.0'
+
+    implementation 'com.google.android.gms:play-services-wearable:16.0.1'
+
 }
